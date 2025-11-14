@@ -1,0 +1,7 @@
+/* src/index.css */
+@import "tailwindcss";
+
+/* നിന്റെ custom styles ഇവിടെ */
+body {
+  font-family: system-ui, sans-serif;
+}

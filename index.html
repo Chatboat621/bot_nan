@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Widget Demo</title>
+
+    <!-- Frontend → Backend config (runs before the app mounts) -->
+    <script>
+      // If your API is at /messages (root):
+      window.API_BASE = "http://localhost:8000";   // ← no trailing slash
+
+      // If your API is under /console (i.e. POST /console/messages), use:
+      // window.API_BASE = "http://127.0.0.1:8000/console";
+
+      // Force this conversation id
+      window.CONVERSATION_ID = "conv_e6caad3857be";
+
+      // Optional: clear any previously saved conv_id so this one takes effect immediately
+      try { localStorage.removeItem("conv_id"); } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
