@@ -8,14 +8,15 @@
     <!-- Frontend → Backend config (runs before the app mounts) -->
     <script>
       // If your API is at /messages (root):
-      window.API_BASE = "http://localhost:8000";   // ← no trailing slash
+      //window.API_BASE = "http://localhost:8000";   // ← no trailing slash
 
       // If your API is under /console (i.e. POST /console/messages), use:
       // window.API_BASE = "http://127.0.0.1:8000/console";
-
+           window.API_BASE="https://api.texef.com";
+          
       // Force this conversation id
-      window.CONVERSATION_ID = "conv_e6caad3857be";
-
+      // window.CONVERSATION_ID = "conv_e6caad3857be";
+      // window.VITE_TENANT_ID="tnt_001";
       // Optional: clear any previously saved conv_id so this one takes effect immediately
       try { localStorage.removeItem("conv_id"); } catch (e) {}
     </script>

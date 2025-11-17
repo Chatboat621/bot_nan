@@ -111,7 +111,7 @@ function resolveApiBase(prop?: string) {
     readWindow(["API_BASE"]) ||
     readVite(["VITE_API_URL","REACT_APP_API_URL","API_BASE"]) ||
     readLS("api_base") ||
-    "http://127.0.0.1:8000"
+    "https://api.texef.com"
   );
 }
 const TENANT_LS_KEY = "tenant_id";
@@ -169,8 +169,10 @@ function gmailComposeUrl(to: string, subject?: string, body?: string, accountInd
 /** ---------- Agent intent detector ---------- */
 function isAgentIntent(text: string): boolean {
   const t = (text || "").trim().toLowerCase();
-  if (/^[\.\-_\s]{1,6}$/.test(t)) return true;
-  if (t.length <= 2) return true;
+  // ❌ ഈ രണ്ട് line കൂടി വേണ്ട
+  // if (/^[\.\-_\s]{1,6}$/.test(t)) return true;
+  // if (t.length <= 2) return true;
+
   const K = [
     "talk to agent","talk to human","connect agent","connect with team","live support",
     "customer care","call me","speak to person","need human","escalate","not helpful",
@@ -178,6 +180,7 @@ function isAgentIntent(text: string): boolean {
   ];
   return K.some(k => t.includes(k));
 }
+
 
 /** ---------- Chat API helpers ---------- */
 type RawMessage = {
@@ -189,17 +192,50 @@ type RawMessage = {
   reply?: string;
   created_at?: string | number;
 };
-async function listMessages(apiBase: string, opts: { conversation_id: string; sender?: string; limit?: number }) {
+// async function listMessages(apiBase: string, opts: { conversation_id: string; sender?: string; limit?: number }) {
+//   // FIX: use /api/messages
+//   const url = new URL(joinUrl(apiBase, "/api/messages"));
+//   url.searchParams.set("conversation_id", opts.conversation_id);
+//   if (opts.sender) url.searchParams.set("sender", opts.sender);
+//   if (opts.limit) url.searchParams.set("limit", String(opts.limit));
+//   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+//   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+//   const data = await res.json();
+//   return Array.isArray(data) ? (data as RawMessage[]) : [];
+// }
+
+async function listMessages(
+  apiBase: string,
+  opts: { conversation_id: string; sender?: string; limit?: number }
+) {
   // FIX: use /api/messages
   const url = new URL(joinUrl(apiBase, "/api/messages"));
   url.searchParams.set("conversation_id", opts.conversation_id);
   if (opts.sender) url.searchParams.set("sender", opts.sender);
   if (opts.limit) url.searchParams.set("limit", String(opts.limit));
-  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+
+  const res = await fetch(url.toString(), {
+    headers: { Accept: "application/json" },
+  });
+
+  // 404 => ഈ conversation-ന് history ഇല്ല, അതുകൊണ്ട് error അല്ല
+  if (!res.ok) {
+    if (res.status === 404) {
+      console.info(
+        "[messages] no history yet for conversation_id=",
+        opts.conversation_id
+      );
+      return [] as RawMessage[];
+    }
+
+    // മറ്റെല്ലാ status-ുകൾക്കും proper error
+    throw new Error(`GET ${url.toString()} failed: ${res.status}`);
+  }
+
   const data = await res.json();
   return Array.isArray(data) ? (data as RawMessage[]) : [];
 }
+
 function normalize(raw: RawMessage): ChatMessage {
   const txt = raw.text ?? raw.message ?? raw.reply ?? "";
   const s = (raw.sender || "").toLowerCase();
@@ -795,15 +831,9 @@ function Panel({
 
   // 🔑 token state to control WS timing
   const [token, setToken] = useState<string | null>(() => (typeof localStorage !== "undefined" ? localStorage.getItem("chat_token") : null));
+  const [convId, setConvId] = useState<string>(() => DEFAULT_CONV_ID);
 
-  const [convId, setConvId] = useState<string>(
-    () =>
-      initialConvId ||
-      urlParam("conv_id") ||
-      (typeof window !== "undefined" ? (window as any)["CONVERSATION_ID"] : undefined) ||
-      (typeof localStorage !== "undefined" ? localStorage.getItem(storageKey) || "" : "") ||
-      DEFAULT_CONV_ID
-  );
+ 
   useEffect(() => { try { if (convId) localStorage.setItem(storageKey, convId); } catch {} }, [convId, storageKey]);
 
   // ⬇️ Extracted init function (so we can call it from multiple places)
@@ -862,41 +892,75 @@ function Panel({
   };
 
   // ✅ Init effect (runs once) with tenant-change detection
-  useEffect(() => {
-    (async () => {
-      if (!autoCreate) return;
+  // useEffect(() => {
+  //   (async () => {
+  //     if (!autoCreate) return;
 
-      const currentTenant = getResolvedTenantId(tenantId);
-      const savedTenant = (typeof localStorage !== "undefined" && localStorage.getItem(TENANT_LS_KEY)) || "";
+  //     const currentTenant = getResolvedTenantId(tenantId);
+  //     const savedTenant = (typeof localStorage !== "undefined" && localStorage.getItem(TENANT_LS_KEY)) || "";
 
-      if (!currentTenant) {
-        console.error("❌ No tenant id (props/URL/window/env/LS). Skipping init.");
-        return;
-      }
+  //     if (!currentTenant) {
+  //       console.error("❌ No tenant id (props/URL/window/env/LS). Skipping init.");
+  //       return;
+  //     }
 
-      // Tenant changed → clear old auth/conv so we force a fresh init
-      if (savedTenant && currentTenant !== savedTenant) {
-        dbg("🔁 Tenant changed → clearing old state", { savedTenant, currentTenant });
-        try {
-          localStorage.removeItem("chat_token");
-          localStorage.removeItem(storageKey);
-          localStorage.setItem(TENANT_LS_KEY, currentTenant);
-        } catch {}
-      }
+  //     // Tenant changed → clear old auth/conv so we force a fresh init
+  //     if (savedTenant && currentTenant !== savedTenant) {
+  //       dbg("🔁 Tenant changed → clearing old state", { savedTenant, currentTenant });
+  //       try {
+  //         localStorage.removeItem("chat_token");
+  //         localStorage.removeItem(storageKey);
+  //         localStorage.setItem(TENANT_LS_KEY, currentTenant);
+  //       } catch {}
+  //     }
 
-      const existingToken = token || (typeof localStorage !== "undefined" ? localStorage.getItem("chat_token") : null);
-      const existingConv  = convId && convId !== DEFAULT_CONV_ID;
+  //     const existingToken = token || (typeof localStorage !== "undefined" ? localStorage.getItem("chat_token") : null);
+  //     const existingConv  = convId && convId !== DEFAULT_CONV_ID;
 
-      if (existingConv && existingToken) {
-        dbg("↪️ Skip init (already have conv & token)", { convId, token: show(existingToken) });
-        try { localStorage.setItem(TENANT_LS_KEY, currentTenant); } catch {}
-        return;
-      }
+  //     if (existingConv && existingToken) {
+  //       dbg("↪️ Skip init (already have conv & token)", { convId, token: show(existingToken) });
+  //       try { localStorage.setItem(TENANT_LS_KEY, currentTenant); } catch {}
+  //       return;
+  //     }
 
-      await initWidget();
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  //     await initWidget();
+  //   })();
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, []);
+
+useEffect(() => {
+  (async () => {
+    if (!autoCreate) return;
+
+    const currentTenant = getResolvedTenantId(tenantId);
+    const savedTenant =
+      (typeof localStorage !== "undefined" && localStorage.getItem(TENANT_LS_KEY)) || "";
+
+    if (!currentTenant) {
+      console.error("❌ No tenant id (props/URL/window/env/LS). Skipping init.");
+      return;
+    }
+
+    // Tenant changed → clear old auth/conv so we force a fresh init
+    if (savedTenant && currentTenant !== savedTenant) {
+      dbg("🔁 Tenant changed → clearing old state", { savedTenant, currentTenant });
+      try {
+        localStorage.removeItem("chat_token");
+        localStorage.removeItem(storageKey);
+      } catch {}
+    }
+
+    // ✅ IMPORTANT: always do a fresh init
+    await initWidget();
+
+    // Save tenant we used
+    try {
+      localStorage.setItem(TENANT_LS_KEY, currentTenant);
+    } catch {}
+  })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
 
   // Load history after we have conversation id
   useEffect(() => {
@@ -947,7 +1011,7 @@ function Panel({
   async function escalateToAgent(reason: "bot_timeout" | "network_error" | "empty_reply" | "user_intent") {
     if (agentMode || agentJoining) return;
     setAgentJoining(true);
-    add("system", "Connecting you to a human agent…");
+    // add("system", "Connecting you to a human agent…");
     void notifySupport(apiBase, { conversation_id: convId, action: reason, reason });
     setAgentMode(true);
   }
