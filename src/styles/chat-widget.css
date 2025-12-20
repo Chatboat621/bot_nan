@@ -25,6 +25,7 @@
 .chat-launcher__icon {
   width: 24px;
   height: 24px;
+   object-fit: contain;
 }
 #chat-root {
   display: flex !important;

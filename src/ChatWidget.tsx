@@ -167,7 +167,7 @@ function resolveApiBase(prop?: string) {
 
 // TENANT: window.__CHATWIDGET_CONFIG__.TENANT_ID or fallback
 function resolveTenantId(): string {
-  return readWindow(["TENANT_ID"]) || "";  //tenant_c62dcf0f
+  return readWindow(["TENANT_ID"]) || ""; 
 }
 
 const API_BASE = resolveApiBase();
@@ -647,15 +647,15 @@ function Header({
 }
 
 /** ---------- Quick card ---------- */
-function QuickCard({ onSearch }: { onSearch: () => void }) {
-  return (
-    <div className="quick-card">
-      <div className="quick-card__text">
-        Ask me anything about your account, tickets, or support.
-      </div>
-    </div>
-  );
-}
+// function QuickCard({ onSearch }: { onSearch: () => void }) {
+//   return (
+//     <div className="quick-card">
+//       <div className="quick-card__text">
+//         Ask me anything about your account, tickets, or support.
+//       </div>
+//     </div>
+//   );
+// }
 
 /** ---------- Composer ---------- */
 function Composer({
@@ -711,7 +711,7 @@ function Composer({
         </button>
       </div>
       <div className="composer__footer">
-        <Bot className="composer__footer-icon" /> Powered by The Pixel Power
+        <Bot className="composer__footer-icon" /> Powered by the Texef
       </div>
     </div>
   );
@@ -1012,7 +1012,6 @@ function ChatPane({
     <div className="chat-main">
       <div ref={scrollerRef} className="chat-main__scroll">
         <div className="chat-main__quick">
-          <QuickCard onSearch={goHelpdesk} />
         </div>
 
         {/* {messages.map((m) => (
@@ -1033,12 +1032,12 @@ function ChatPane({
       {isIdentityRequestMsg && showEscalationForm && (
         <div className="escalation-form">
           <h3>Please enter your details</h3>
-          <p>You may provide your <b>name</b>, <b>email</b>, or <b>phone number</b>.</p>
+          <p>You may provide your <b>name</b>,<b>phone number</b>.</p>
 
           <input
             type="text"
             className="escalation-input"
-            placeholder="Name, Email, or Phone"
+            placeholder="Name,or Phone"
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
           />
@@ -1047,22 +1046,30 @@ function ChatPane({
             className="escalation-submit"
             disabled={emailLoading}
             onClick={async () => {
-              const input = emailInput.trim();
-              if (!input) {
-                alert("Please enter name, email, or phone number.");
-                return;
-              }
+            const input = emailInput.trim();
 
-              // ⭐ VALIDATION RULES
-              const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
-              const isIndia = /^(\+91[\-\s]?)?[6-9]\d{9}$/.test(input);
-              const isUAE = /^(?:\+971[\-\s]?)?5[0-9]{8}$/.test(input);
-              const isName = /^[A-Za-z\s]{2,}$/.test(input);
+if (!input) {
+  alert("Please enter name or phone number.");
+  return;
+}
 
-              if (!isEmail && !isIndia && !isUAE && !isName) {
-                alert("Enter a valid name, email, or phone number.");
-                return;
-              }
+// ❌ Explicitly block email
+if (/@/.test(input)) {
+  alert("Email is not supported. Please enter name or phone number.");
+  return;
+}
+
+// ✅ Global phone (all countries)
+const isPhone = /^[+]?[\d\s\-()]{6,}$/.test(input);
+
+// ✅ Name
+const isName = /^[A-Za-z\s]{2,}$/.test(input);
+
+if (!isPhone && !isName) {
+  alert("Please enter a valid name or phone number.");
+  return;
+}
+
 
               setEmailLoading(true);
 
@@ -1080,7 +1087,7 @@ function ChatPane({
                 });
                 const data = await res.json().catch(() => ({}));
                 if (res.ok && data.ok) {
-                  add("system", "Thank you! Your details have been submitted.");
+                  add("system", "Thank you! Your details have been submitted successfully. An agent is now ready to assist you.");
                   setShowEscalationForm(false);   // close only on success
                   setCookie("escalation_form_shown", "true");
 
@@ -1914,7 +1921,20 @@ export default function ChatWidgetDemo(
         className="chat-launcher"
         aria-label="Open chat"
       >
-        <Bot className="chat-launcher__icon" />
+  {window.__CHATWIDGET_CONFIG__?.LOGO_URL ? (
+   <img
+    src={window.__CHATWIDGET_CONFIG__.LOGO_URL}
+    alt="Bot"
+    className="chat-launcher__icon"
+    onError={(e) => {
+      e.currentTarget.onerror = null;
+      e.currentTarget.src = "/default-bot.png";
+    }}
+  />
+) : (
+  <Bot className="chat-launcher__icon" />
+)}
+
       </button>
 
       <AnimatePresence>
