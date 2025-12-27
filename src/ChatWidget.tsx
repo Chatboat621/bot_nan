@@ -167,7 +167,7 @@ function resolveApiBase(prop?: string) {
 
 // TENANT: window.__CHATWIDGET_CONFIG__.TENANT_ID or fallback
 function resolveTenantId(): string {
-  return readWindow(["TENANT_ID"]) || ""; 
+  return readWindow(["TENANT_ID"]) || "tenant_d9368868"; 
 }
 
 const API_BASE = resolveApiBase();
@@ -753,9 +753,9 @@ function HelpdeskPane({ apiBase, convId }: { apiBase: string; convId?: string })
   const [answer, setAnswer] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<number>(-1);
-
   const [docsOpen, setDocsOpen] = useState(false);
   const [docsUrl, setDocsUrl] = useState<string>(HELP_DOCS_URL);
+  
 
   type FlashMsg = {
     id: string;
@@ -973,40 +973,51 @@ function ChatPane({
 })
  {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const [hasUnseen, setHasUnseen] = useState(false);
-
   useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      const atBottom = isNearBottom(el);
-      if (atBottom) setHasUnseen(false);
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  const el = scrollerRef.current;
+  if (!el) return;
 
-  const prevLen = useRef(0);
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const wasNear = isNearBottom(el);
-    const gotNew = messages.length > prevLen.current;
-    prevLen.current = messages.length;
-    if (gotNew) {
-      if (wasNear)
-        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-      else setHasUnseen(true);
-    }
-  }, [messages]);
+  requestAnimationFrame(() => {
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: "smooth",
+    });
+  });
+}, [messages]);
+  // const [hasUnseen, setHasUnseen] = useState(false);
 
-  const jumpToBottom = () => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    setHasUnseen(false);
-  };
+  // useEffect(() => {
+  //   const el = scrollerRef.current;
+  //   if (!el) return;
+  //   const onScroll = () => {
+  //     const atBottom = isNearBottom(el);
+  //     if (atBottom) setHasUnseen(false);
+  //   };
+  //   el.addEventListener("scroll", onScroll, { passive: true });
+  //   onScroll();
+  //   return () => el.removeEventListener("scroll", onScroll);
+  // }, []);
+
+  // const prevLen = useRef(0);
+  // useEffect(() => {
+  //   const el = scrollerRef.current;
+  //   if (!el) return;
+  //   const wasNear = isNearBottom(el);
+  //   const gotNew = messages.length > prevLen.current;
+  //   prevLen.current = messages.length;
+  //   if (gotNew) {
+  //     if (wasNear)
+  //       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  //     else setHasUnseen(true);
+  //   }
+  // }, [messages]);
+
+  // const jumpToBottom = () => {
+  //   const el = scrollerRef.current;
+  //   if (!el) return;
+  //   el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  //   setHasUnseen(false);
+  // };
 
   return (
     <div className="chat-main">
@@ -1119,20 +1130,6 @@ if (!isPhone && !isName) {
             <div className="chat-bubble chat-bubble--bot">Typing…</div>
           </div>
         )}
-
-        {hasUnseen && (
-          <div className="chat-main__new">
-            <span className="chat-main__new-pill">
-              New messages{" "}
-              <button
-                onClick={jumpToBottom}
-                className="chat-main__new-link"
-              >
-                Jump
-              </button>
-            </span>
-          </div>
-        )}
       </div>
       <Composer onSend={onSend} agentMode={agentMode} />
     </div>
@@ -1194,7 +1191,11 @@ function Panel({
   typeof document !== "undefined" ? getCookie("chat_token") || null : null
 );
 
-  const [convId, setConvId] = useState<string>(() => DEFAULT_CONV_ID);
+  // const [convId, setConvId] = useState<string>(() => DEFAULT_CONV_ID);
+  const [convId, setConvId] = useState<string>(() => {
+  return getCookie("conv_id") || DEFAULT_CONV_ID;
+});
+
 
   useEffect(() => {
     try {
@@ -1263,20 +1264,37 @@ function Panel({
     }
   };
 
-  useEffect(() => {
-    (async () => {
-      if (!autoCreate) return;
+  // useEffect(() => {
+  //   (async () => {
+  //     if (!autoCreate) return;
 
-      if (initCalledRef.current) {
-        dbg("[INIT] Skipping duplicate initWidget");
-        return;
-      }
-      initCalledRef.current = true;
+  //     if (initCalledRef.current) {
+  //       dbg("[INIT] Skipping duplicate initWidget");
+  //       return;
+  //     }
+  //     initCalledRef.current = true;
 
-      await initWidget();
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  //     await initWidget();
+  //   })();
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, []);
+
+useEffect(() => {
+  (async () => {
+    if (!autoCreate) return;
+
+    // ⭐ Cookie-ൽ conversation already ഉണ്ടെങ്കിൽ → reuse
+    if (convId) {
+      dbg("♻️ Existing conversation restored:", convId);
+      return;
+    }
+
+    if (initCalledRef.current) return;
+    initCalledRef.current = true;
+
+    await initWidget();
+  })();
+}, [convId]);
 
   useEffect(() => {
     if (!convId || convId === DEFAULT_CONV_ID) return;
@@ -1925,7 +1943,7 @@ export default function ChatWidgetDemo(
    <img
     src={window.__CHATWIDGET_CONFIG__.LOGO_URL}
     alt="Bot"
-    className="chat-launcher__icon"
+    className="chat-launcher__img"
     onError={(e) => {
       e.currentTarget.onerror = null;
       e.currentTarget.src = "/default-bot.png";

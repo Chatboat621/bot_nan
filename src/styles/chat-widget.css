@@ -8,15 +8,14 @@
   width: 56px;
   border-radius: 999px;
   border: none;
-  background: #2563eb;
-  color: #ffffff;
+  background: transparent;   /* ✅ UPDATE */
   display: grid;
   place-items: center;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
-  z-index: 40;
+  overflow: hidden;          /* 🔥 MUST */
 }
+
 
 .chat-launcher:hover {
   background: #1d4ed8;
@@ -688,8 +687,9 @@
 
 /* Dynamic Bot Avatar in Launcher Button */
 .chat-launcher__img {
-  width: 42px;
-  height: 42px;
+  width: 100%;          /* ✅ FULL */
+  height: 100%;         /* ✅ FULL */
   border-radius: 50%;
-  object-fit: cover;
+  object-fit: cover;    /* 🔥 FULL COVER */
 }
+
