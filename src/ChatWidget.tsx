@@ -115,8 +115,18 @@ function readLS(key: string): string | undefined {
     return undefined;
   }
 }
+/**-------sessionstorage chat -----*/
+
+// Per-tab chat session ID
+let chatSessionId = sessionStorage.getItem("chat_session_id");
+if (!chatSessionId) {
+  chatSessionId = crypto.randomUUID();
+  sessionStorage.setItem("chat_session_id", chatSessionId);
+}
+
+
 /** ---------- Cookie helpers ---------- */
-function setCookie(name: string, value: string, hours: number = 24) {
+ function setCookie(name: string, value: string, hours: number = 24) {
   try {
     const expires = new Date();
     expires.setTime(expires.getTime() + hours * 60 * 60 * 1000);
@@ -1192,16 +1202,59 @@ function Panel({
 );
 
   // const [convId, setConvId] = useState<string>(() => DEFAULT_CONV_ID);
-  const [convId, setConvId] = useState<string>(() => {
+//   const [convId, setConvId] = useState<string>(() => {
+//   return getCookie("conv_id") || DEFAULT_CONV_ID;
+// }); for now commented
+
+
+const [convId, setConvId] = useState<string>(() => {
+  const allowRestore =
+    sessionStorage.getItem("chat_allow_restore") === "true";
+
+  // New tab → empty chat
+  if (!allowRestore) {
+    return DEFAULT_CONV_ID;
+  }
+
+  // Same tab refresh → restore
   return getCookie("conv_id") || DEFAULT_CONV_ID;
 });
 
 
-  useEffect(() => {
-    try {
-      if (convId) setCookie(storageKey, convId);
-    } catch {}
-  }, [convId, storageKey]);
+  // useEffect(() => {
+  //   try {
+  //     if (convId) setCookie(storageKey, convId);
+  //   } catch {}
+  // }, [convId, storageKey]);
+
+
+useEffect(() => {
+  if (sessionStorage.getItem("chat_allow_restore") !== "true") {
+    console.log("History restore blocked (new tab)");
+    return;
+  }
+
+  if (!convId || convId === DEFAULT_CONV_ID) return;
+
+  console.log("📜 Loading history for", convId);
+
+  listMessages(apiBase, {
+    conversation_id: convId,
+    limit: 500,
+  })
+    .then((raw) => {
+      const mapped = raw.map(normalize);
+      mapped.sort((a, b) => a.ts - b.ts);
+      setMessages(mapped);
+    })
+    .catch((err) => {
+      console.warn("Failed to load history:", err);
+    });
+}, [apiBase, convId]);
+
+
+
+
 
   const initWidget = async () => {
     try {
@@ -1467,7 +1520,10 @@ if (role === "system") {
 
   const onSend = async (text: string) => {
   add("user", text);
-
+ // Enable chat restore for this tab after first user interaction (cleared on tab close)
+ if (!sessionStorage.getItem("chat_allow_restore")) {
+    sessionStorage.setItem("chat_allow_restore", "true");
+  }
   // 1) user human ചോദിച്ചാൽ escalation trigger ചെയ്യാം,
   //    പക്ഷേ message backend-ലേക്കും പോകണം, അതിനാൽ return ചെയ്യണ്ട.
   if (!agentMode && isAgentIntent(text)) {
